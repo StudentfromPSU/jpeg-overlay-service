@@ -5,6 +5,7 @@
 #include <grpcpp/support/server_interceptor.h>
 #include <string>
 
+// Logs every incoming RPC request
 class LoggerInterceptor final : public grpc::experimental::Interceptor
 {
 public:
@@ -23,11 +24,12 @@ public:
 
     void Intercept(grpc::experimental::InterceptorBatchMethods* methods) override
     {
-        // !importent to proceed the request
+        // Continue request processing
         methods->Proceed();
     }
 };
 
+// Factory used by gRPC to create interceptors
 class LoggerInterceptorFactory : public grpc::experimental::ServerInterceptorFactoryInterface
 {
 public:

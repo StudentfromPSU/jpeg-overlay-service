@@ -10,6 +10,7 @@
 
 #include "server/interceptors.hpp"
 
+// Wrapper around gRPC server lifecycle
 class Server
 {
 public:
@@ -23,5 +24,7 @@ private:
     std::string server_address_;
     std::string server_name_;
     std::shared_ptr<grpc::Service> service_;
+
+    // Registered interceptor factories
     std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> interceptors_creators_;
 };

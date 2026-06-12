@@ -2,6 +2,7 @@
 
 #include <string>
 
+// Read environment variable or return default value
 inline std::string get_env(const std::string& key, const std::string& default_value = "")
 {
     const char* value = std::getenv(key.c_str());
