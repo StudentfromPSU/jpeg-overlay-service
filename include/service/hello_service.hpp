@@ -1,14 +1,7 @@
 #pragma once
 
-#include <mutex>
-
-
 #include <grpcpp/grpcpp.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/support/status.h>
-#include <grpcpp/server_interface.h>
 
-#include <google/protobuf/map.h>
 
 #include "hello.grpc.pb.h"
 #include "hello.pb.h"

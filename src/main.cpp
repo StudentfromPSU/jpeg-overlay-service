@@ -24,7 +24,6 @@ int main()
 {
     try
     {
-        // Register signal handlers
         std::signal(SIGINT, signal_handler);
         std::signal(SIGTERM, signal_handler);
 
