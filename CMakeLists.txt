@@ -2,6 +2,14 @@
 
 project(grpc_server)
 
+
+add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
@@ -47,10 +55,36 @@ target_link_libraries(genproto_lib
         gRPC::grpc++
 )
 
+
+function(enable_strict_warnings target)
+
+    if(MSVC)
+        target_compile_options(${target}
+            PRIVATE
+                /W4
+                /WX
+        )
+    else()
+        target_compile_options(${target}
+            PRIVATE
+                -Wall
+                -Wextra
+                -Wpedantic
+                -Werror
+        )
+    endif()
+
+endfunction()
+
+
+
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/server/server.cpp
-    src/service/hello_service.cpp)
+    src/service/hello_service.cpp
+)
+
+enable_strict_warnings(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE genproto_lib

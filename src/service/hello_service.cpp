@@ -5,7 +5,7 @@ HelloService::HelloService()
 }
 
 grpc::Status HelloService::SayHello(
-    grpc::ServerContext* context,
+    [[maybe_unused]] grpc::ServerContext* context,
     const hw::HelloRequest* request,
     hw::HelloReply* response)
 {
