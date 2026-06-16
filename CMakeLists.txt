@@ -2,6 +2,22 @@
 
 project(grpc_server)
 
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+    )
+endif()
+
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
@@ -50,7 +66,8 @@ target_link_libraries(genproto_lib
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/server/server.cpp
-    src/service/hello_service.cpp)
+    src/service/hello_service.cpp
+)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE genproto_lib

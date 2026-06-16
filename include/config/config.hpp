@@ -2,13 +2,6 @@
 
 #include <string>
 
-// Read environment variable or return default value
-inline std::string get_env(const std::string& key, const std::string& default_value = "")
-{
-    const char* value = std::getenv(key.c_str());
-    return value ? value : default_value;
-}
-
 struct Config
 {
     std::string host;
@@ -17,8 +10,8 @@ struct Config
     static Config New()
     {
         Config config;
-        config.host = get_env("HOST", "0.0.0.0");
-        config.port = get_env("PORT", "50051");
+        config.host = "0.0.0.0";
+        config.port = "50051";
         return config;
     }
 };
