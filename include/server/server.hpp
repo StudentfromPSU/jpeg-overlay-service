@@ -14,7 +14,9 @@
 class Server
 {
 public:
-    explicit Server(std::string server_address = "0.0.0.0:50051", std::shared_ptr<grpc::Service> service = nullptr, std::string server_name = "Server");
+
+    explicit Server(std::string server_address = "0.0.0.0:50051", std::shared_ptr<grpc::Service> service = nullptr,
+                    std::string server_name = "Server", int max_connections = 5);
 
     void Start();
     void Stop();
@@ -24,6 +26,7 @@ private:
     std::string server_address_;
     std::string server_name_;
     std::shared_ptr<grpc::Service> service_;
+    std::shared_ptr<ConnectionLimiter> connection_limiter_;
 
     // Registered interceptor factories
     std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> interceptors_creators_;

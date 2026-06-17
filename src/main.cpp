@@ -30,10 +30,10 @@ int main()
 
         // Load configuration and initialize service
         Config config = Config::New();
-        std::shared_ptr<HelloService> oService = std::make_shared<HelloService>();
-        g_server = std::make_unique<Server>(config.host + ":" + config.port, oService, hw::Greeter::service_full_name());
+        auto connection_limiter = std::make_shared<ConnectionLimiter>(config.max_connections);
+        std::shared_ptr<HelloService> oService = std::make_shared<HelloService>(connection_limiter);
+        g_server = std::make_unique<Server>(config.host + ":" + config.port, oService, hw::Greeter::service_full_name(), config.max_connections);
 
-        // Wait for shutdown signal in a separate thread
         std::thread shutdown_thread(
             [&]()
             {
@@ -47,7 +47,6 @@ int main()
 
                 g_server->Stop();
             });
-        // Start serving incoming RPC requests
         g_server->Start();
 
         shutdown_thread.join();
