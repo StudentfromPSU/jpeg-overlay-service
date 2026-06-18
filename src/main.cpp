@@ -4,8 +4,11 @@
 #include <mutex>
 
 #include "config/config.hpp"
-#include "service/hello_service.hpp"
 #include "server/server.hpp"
+#include "hello.grpc.pb.h"
+#include "hello.pb.h"
+
+namespace hw = helloworld;
 
 std::unique_ptr<Server> g_server = nullptr;
 bool shutdown_requested = false;
@@ -28,12 +31,11 @@ int main()
         std::signal(SIGINT, signal_handler);
         std::signal(SIGTERM, signal_handler);
 
-        // Load configuration and initialize service
+        // Load configuration and initialize server
         Config config = Config::New();
-        auto connection_limiter = std::make_shared<ConnectionLimiter>(config.max_connections);
-        std::shared_ptr<HelloService> oService = std::make_shared<HelloService>(connection_limiter);
-        g_server = std::make_unique<Server>(config.host + ":" + config.port, oService, hw::Greeter::service_full_name(), config.max_connections);
+        g_server = std::make_unique<Server>(config.host + ":" + config.port, hw::Greeter::service_full_name(), 3);
 
+        // Wait for shutdown signal in a separate thread
         std::thread shutdown_thread(
             [&]()
             {
@@ -47,6 +49,7 @@ int main()
 
                 g_server->Stop();
             });
+        // Start serving incoming RPC requests
         g_server->Start();
 
         shutdown_thread.join();

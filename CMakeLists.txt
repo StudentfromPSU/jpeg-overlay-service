@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.5)
 
 project(grpc_server)
 
@@ -7,8 +7,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+
 if(MSVC)
-    add_compile_options(/W4 /WX)
+    add_compile_options(/W4 /WX /wd4702 /wd4996)
 else()
     add_compile_options(
         -Wall
@@ -17,6 +18,7 @@ else()
         -Werror
     )
 endif()
+
 
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
@@ -66,23 +68,8 @@ target_link_libraries(genproto_lib
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/server/server.cpp
-    src/service/hello_service.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE genproto_lib
 )
-
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-    ${PROJECT_SOURCE_DIR}/include
-)
-
-if(WIN32)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}>
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>
-        COMMAND_EXPAND_LISTS
-    )
-endif()
