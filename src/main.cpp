@@ -1,58 +1,47 @@
 #include <iostream>
 #include <csignal>
-#include <condition_variable>
-#include <mutex>
+#include <atomic>
+#include <thread>
+#include <chrono>
 
 #include "config/config.hpp"
 #include "server/server.hpp"
 #include "hello.grpc.pb.h"
-#include "hello.pb.h"
 
 namespace hw = helloworld;
 
-std::unique_ptr<Server> g_server = nullptr;
-bool shutdown_requested = false;
-std::mutex shutdown_mutex;
-std::condition_variable shutdown_cv;
+std::atomic<bool> shutdown_requested{false};
 
 void signal_handler(int signal)
 {
-    std::cout << "Received signal " << signal << std::endl;
-
-    shutdown_requested = true;
-    shutdown_cv.notify_one();
+    (void)signal;
+    shutdown_requested.store(true, std::memory_order_release);
 }
 
 int main()
 {
     try
     {
-        // Register signal handlers for graceful shutdown
-        std::signal(SIGINT, signal_handler);
-        std::signal(SIGTERM, signal_handler);
+        if (std::signal(SIGINT, signal_handler) == SIG_ERR)
+        {
+            throw std::runtime_error("Failed to register SIGINT handler");
+        }
+        if (std::signal(SIGTERM, signal_handler) == SIG_ERR)
+        {
+            throw std::runtime_error("Failed to register SIGTERM handler");
+        }
 
-        // Load configuration and initialize server
         Config config = Config::New();
-        g_server = std::make_unique<Server>(config.host + ":" + config.port, hw::Greeter::service_full_name(), 3);
+        auto server = std::make_unique<Server>(config.host + ":" + config.port, hw::Greeter::service_full_name(), 3);
 
-        // Wait for shutdown signal in a separate thread
-        std::thread shutdown_thread(
-            [&]()
-            {
-                std::unique_lock<std::mutex> lock(shutdown_mutex);
+        server->Start();
 
-                shutdown_cv.wait(lock,
-                    [&]()
-                    {
-                        return shutdown_requested;
-                    });
+        while (!shutdown_requested.load(std::memory_order_acquire))
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
 
-                g_server->Stop();
-            });
-        // Start serving incoming RPC requests
-        g_server->Start();
-
-        shutdown_thread.join();
+        server->Stop();
     }
     catch (const std::exception& e)
     {

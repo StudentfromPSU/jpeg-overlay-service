@@ -2,20 +2,17 @@
 #include <iostream>
 #include <grpcpp/server_builder.h>
 #include <stdexcept>
-//#include <thread>
-//#include <chrono>
-
-enum CallStatus { CREATE, PROCESS, FINISH };
+#include <thread>
+#include <cstdint>
+#include "hello.grpc.pb.h"
 
 class CallData
 {
 public:
-    CallData(helloworld::Greeter::AsyncService* service,
-             grpc::ServerCompletionQueue* cq,
-             Server* server)
+    CallData(helloworld::Greeter::AsyncService* service, grpc::ServerCompletionQueue* cq, Server* server)
         : service_(service), cq_(cq), server_(server), responder_(&ctx_), status_(CREATE), connection_acquired_(false)
     {
-        Proceed();
+        Proceed(true);
     }
 
     ~CallData()
@@ -26,47 +23,67 @@ public:
         }
     }
 
-    void Proceed()
+    void Proceed(bool ok)
     {
-        if (status_ == CREATE)
+        try
         {
-            status_ = PROCESS;
-            service_->RequestSayHello(&ctx_, &request_, &responder_, cq_, cq_, this);
-        }
-        else if (status_ == PROCESS)
-        {
-            new CallData(service_, cq_, server_);
-
-            if (!server_->TryAcquireConnection())
+            switch (status_)
             {
-                std::cout << "Connection limit reached, rejecting request" << std::endl;
-                status_ = FINISH;
-                responder_.FinishWithError(
-                    grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "Server at max connections"),
-                    this);
-                return;
-            }
+                case CREATE:
+                {
+                    status_ = PROCESS;
+                    service_->RequestSayHello(&ctx_, &request_, &responder_, cq_, cq_, this);
+                    break;
+                }
 
-            connection_acquired_ = true;
-            std::cout << "RPC called: /helloworld.Greeter/SayHello" << std::endl;
-            //testing...
-            //std::this_thread::sleep_for(std::chrono::seconds(10));
-            reply_.set_message("Hello, " + request_.name());
-            status_ = FINISH;
-            responder_.Finish(reply_, grpc::Status::OK, this);
+                case PROCESS:
+                {
+                    if (!ok)
+                    {
+                        delete this;
+                        return;
+                    }
+
+                    new CallData(service_, cq_, server_);
+
+                    if (!server_->TryAcquireConnection())
+                    {
+                        std::cout << "Connection limit reached, rejecting request" << std::endl;
+                        status_ = FINISH;
+                        responder_.FinishWithError(
+                            grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "Server at max connections"), this);
+                        return;
+                    }
+
+                    connection_acquired_ = true;
+                    reply_.set_message("Hello, " + request_.name());
+                    status_ = FINISH;
+                    responder_.Finish(reply_, grpc::Status::OK, this);
+                    break;
+                }
+
+                case FINISH:
+                {
+                    delete this;
+                    return;
+                }
+            }
         }
-        else
+        catch (const std::exception& e)
         {
+            std::cerr << "Exception in CallData::Proceed: " << e.what() << std::endl;
             if (status_ != FINISH)
             {
-                std::cerr << "Invalid CallData status: " << status_ << std::endl;
-                return;
+                status_ = FINISH;
+                responder_.FinishWithError(
+                    grpc::Status(grpc::StatusCode::INTERNAL, "Internal server error"),
+                    this);
             }
-            delete this;
         }
     }
 
 private:
+    enum CallStatus { CREATE, PROCESS, FINISH };
     helloworld::Greeter::AsyncService* service_;
     grpc::ServerCompletionQueue* cq_;
     Server* server_;
@@ -79,8 +96,12 @@ private:
 };
 
 Server::Server(std::string server_address, std::string server_name, int max_connections)
-    : server_address_(server_address), server_name_(server_name), max_connections_(max_connections)
+    : server_address_(std::move(server_address)), server_name_(std::move(server_name)), max_connections_(max_connections)
 {
+    if (max_connections <= 0)
+    {
+        throw std::invalid_argument("max_connections must be positive");
+    }
 }
 
 Server::~Server()
@@ -90,21 +111,20 @@ Server::~Server()
 
 bool Server::TryAcquireConnection()
 {
-    std::lock_guard<std::mutex> lock(connections_mutex_);
-    if (active_connections_ < max_connections_)
+    uint32_t current = active_connections_.load(std::memory_order_relaxed);
+    while (current < max_connections_)
     {
-        active_connections_++;
-        std::cout << "Connection acquired (active: " << active_connections_ << "/" << max_connections_ << ")" << std::endl;
-        return true;
+        if (active_connections_.compare_exchange_strong(current, current + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+        {
+            return true;
+        }
     }
     return false;
 }
 
 void Server::ReleaseConnection()
 {
-    std::lock_guard<std::mutex> lock(connections_mutex_);
-    active_connections_--;
-    std::cout << "Connection released (active: " << active_connections_ << "/" << max_connections_ << ")" << std::endl;
+    active_connections_.fetch_sub(1, std::memory_order_release);
 }
 
 void Server::Start()
@@ -119,6 +139,10 @@ void Server::Start()
     builder.RegisterService(async_service_.get());
 
     server_ = builder.BuildAndStart();
+    if (!server_)
+    {
+        throw std::runtime_error(std::string("Failed to start server on ") + server_address_);
+    }
 
     std::cout << this->server_name_ << " listening on " << this->server_address_ << std::endl;
     std::cout << "Max connections: " << max_connections_ << std::endl;
@@ -126,29 +150,47 @@ void Server::Start()
 
     RequestNewCall(async_service_.get());
 
-    int num_workers = 4;
-    for (int i = 0; i < num_workers; ++i)
+    unsigned int hardware_threads = std::thread::hardware_concurrency();
+    unsigned int num_workers = std::max(1u, hardware_threads);
+
+    std::cout << "Available CPU cores: " << hardware_threads
+        << ", spawning " << num_workers
+        << " worker threads" << std::endl;
+
+    for (unsigned int i = 0; i < num_workers; ++i)
     {
         worker_threads_.emplace_back(&Server::HandleRpcs, this);
-    }
-
-    for (auto& t : worker_threads_)
-    {
-        t.join();
     }
 }
 
 void Server::Stop()
 {
+    bool expected = false;
+    if (!shutdown_requested_.compare_exchange_strong(expected, true, std::memory_order_acq_rel, std::memory_order_acquire))
+    {
+        return;
+    }
+
     if (!server_) return;
 
     std::cout << this->server_name_ << " shutting down, please wait..." << std::endl;
 
-    shutdown_requested_ = true;
     server_->Shutdown();
-    completion_queue_->Shutdown();
 
-    std::cout << this->server_name_ << " shutdown" << std::endl;
+    if (completion_queue_)
+    {
+        completion_queue_->Shutdown();
+    }
+
+    for (auto& t : worker_threads_)
+    {
+        if (t.joinable())
+        {
+            t.join();
+        }
+    }
+
+    std::cout << this->server_name_ << " shutdown complete" << std::endl;
 }
 
 void Server::HandleRpcs()
@@ -158,13 +200,13 @@ void Server::HandleRpcs()
 
     while (completion_queue_->Next(&tag, &ok))
     {
-        if (!ok)
+        if (!tag)
         {
-            std::cerr << "Completion queue error" << std::endl;
             continue;
         }
+
         CallData* call = static_cast<CallData*>(tag);
-        call->Proceed();
+        call->Proceed(ok);
     }
 }
 

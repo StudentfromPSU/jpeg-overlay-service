@@ -9,7 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 if(MSVC)
-    add_compile_options(/W4 /WX /wd4702 /wd4996)
+    add_compile_options(/W4 /WX /wd4996 /wd4702)
 else()
     add_compile_options(
         -Wall
@@ -71,5 +71,17 @@ add_executable(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
+    PRIVATE genproto_lib
+)
+
+add_executable(greeter_client
+    src/client/greeter_client.cpp
+)
+
+target_include_directories(greeter_client
+    PRIVATE ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(greeter_client
     PRIVATE genproto_lib
 )

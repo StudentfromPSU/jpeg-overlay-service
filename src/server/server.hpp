@@ -8,18 +8,14 @@
 #include <vector>
 #include <thread>
 #include <atomic>
-#include <mutex>
 
 #include "hello.grpc.pb.h"
-
-class CallData;
 
 class Server
 {
 public:
-    explicit Server(std::string server_address = "0.0.0.0:50051",
-                    std::string server_name = "Server",
-                    int max_connections = 10);
+    explicit Server(std::string server_address = "0.0.0.0:50051", std::string server_name = "Server", int max_connections = 10);
+
     ~Server();
 
     void Start();
@@ -37,12 +33,9 @@ private:
     std::vector<std::thread> worker_threads_;
     std::atomic<bool> shutdown_requested_{false};
 
-    int max_connections_;
-    std::atomic<int> active_connections_{0};
-    std::mutex connections_mutex_;
+    uint32_t max_connections_;
+    std::atomic<uint32_t> active_connections_{0};
 
     void HandleRpcs();
     void RequestNewCall(helloworld::Greeter::AsyncService* service);
-
-    friend class CallData;
 };
