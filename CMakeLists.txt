@@ -2,11 +2,9 @@
 
 project(grpc_server)
 
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
 
 if(MSVC)
     add_compile_options(/W4 /WX /wd4996 /wd4702)
@@ -18,7 +16,6 @@ else()
         -Werror
     )
 endif()
-
 
 find_package(Protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
@@ -56,7 +53,8 @@ add_library(genproto_lib
 )
 
 target_include_directories(genproto_lib
-    PUBLIC ${GEN_DIR}
+    PUBLIC
+        ${GEN_DIR}
 )
 
 target_link_libraries(genproto_lib
@@ -65,23 +63,5 @@ target_link_libraries(genproto_lib
         gRPC::grpc++
 )
 
-add_executable(${PROJECT_NAME}
-    src/main.cpp
-    src/server/server.cpp
-)
-
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE genproto_lib
-)
-
-add_executable(greeter_client
-    src/client/greeter_client.cpp
-)
-
-target_include_directories(greeter_client
-    PRIVATE ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_libraries(greeter_client
-    PRIVATE genproto_lib
-)
+add_subdirectory(src/client)
+add_subdirectory(src/server)

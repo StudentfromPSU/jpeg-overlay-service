@@ -4,7 +4,7 @@
 #include <thread>
 #include <chrono>
 
-#include "config/config.hpp"
+#include "config/server_config.hpp"
 #include "server/server.hpp"
 #include "hello.grpc.pb.h"
 
@@ -12,9 +12,8 @@ namespace hw = helloworld;
 
 std::atomic<bool> shutdown_requested{false};
 
-void signal_handler(int signal)
+void signal_handler(int)
 {
-    (void)signal;
     shutdown_requested.store(true, std::memory_order_release);
 }
 

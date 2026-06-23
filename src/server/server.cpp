@@ -150,13 +150,14 @@ void Server::Start()
 
     RequestNewCall(async_service_.get());
 
-    unsigned int hardware_threads = std::thread::hardware_concurrency();
-    unsigned int num_workers = std::max(1u, hardware_threads);
+    const unsigned int hardware_threads = std::thread::hardware_concurrency();
+    const unsigned int num_workers = std::max(1u, hardware_threads);
 
     std::cout << "Available CPU cores: " << hardware_threads
         << ", spawning " << num_workers
         << " worker threads" << std::endl;
 
+    worker_threads_.reserve(num_workers);
     for (unsigned int i = 0; i < num_workers; ++i)
     {
         worker_threads_.emplace_back(&Server::HandleRpcs, this);

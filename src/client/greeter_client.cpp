@@ -5,6 +5,7 @@
 #include <chrono>
 #include <mutex>
 #include <grpcpp/grpcpp.h>
+#include "config/client_config.hpp"
 #include "hello.grpc.pb.h"
 
 using grpc::Channel;
@@ -148,8 +149,8 @@ void ConnectionLimitTestParallel(const std::string& target_str, int num_clients)
     }
 
     std::cout << "\n=== Results ===" << std::endl;
-    std::cout << "Successful: " << std::endl;
-    std::cout << "Rejected: " << std::endl;
+    std::cout << "Successful: " << success_count << std::endl;
+    std::cout << "Rejected: " << rejected_count << std::endl;
     std::cout << "Total: " << success_count + rejected_count << std::endl;
 
 }
@@ -205,7 +206,9 @@ void PrintUsage()
 
 int main(int argc, char* argv[])
 {
-    std::string target_str = "localhost:50051";
+    ClientConfig config = ClientConfig::New();
+
+    std::string target_str = config.target;
 
     if (argc < 2)
     {
