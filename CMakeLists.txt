@@ -63,5 +63,5 @@ target_link_libraries(genproto_lib
         gRPC::grpc++
 )
 
-add_subdirectory(src/client)
-add_subdirectory(src/server)
+add_subdirectory(client)
+add_subdirectory(server)

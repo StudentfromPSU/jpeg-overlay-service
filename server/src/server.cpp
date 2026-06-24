@@ -25,65 +25,50 @@ public:
 
     void Proceed(bool ok)
     {
-        try
+        switch (status_)
         {
-            switch (status_)
-            {
-                case CREATE:
-                {
-                    status_ = PROCESS;
-                    service_->RequestSayHello(&ctx_, &request_, &responder_, cq_, cq_, this);
-                    break;
-                }
-
-                case PROCESS:
-                {
-                    if (!ok)
-                    {
-                        delete this;
-                        return;
-                    }
-
-                    new CallData(service_, cq_, server_);
-
-                    if (!server_->TryAcquireConnection())
-                    {
-                        std::cout << "Connection limit reached, rejecting request" << std::endl;
-                        status_ = FINISH;
-                        responder_.FinishWithError(
-                            grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "Server at max connections"), this);
-                        return;
-                    }
-
-                    connection_acquired_ = true;
-                    reply_.set_message("Hello, " + request_.name());
-                    status_ = FINISH;
-                    responder_.Finish(reply_, grpc::Status::OK, this);
-                    break;
-                }
-
-                case FINISH:
-                {
-                    delete this;
-                    return;
-                }
-            }
+        case CREATE:
+        {
+            status_ = PROCESS;
+            service_->RequestSayHello(&ctx_, &request_, &responder_, cq_, cq_, this);
+            break;
         }
-        catch (const std::exception& e)
+
+        case PROCESS:
         {
-            std::cerr << "Exception in CallData::Proceed: " << e.what() << std::endl;
-            if (status_ != FINISH)
+            if (!ok)
             {
+                delete this;
+                return;
+            }
+
+            new CallData(service_, cq_, server_);
+
+            if (!server_->TryAcquireConnection())
+            {
+                std::cout << "Connection limit reached, rejecting request" << std::endl;
                 status_ = FINISH;
                 responder_.FinishWithError(
-                    grpc::Status(grpc::StatusCode::INTERNAL, "Internal server error"),
-                    this);
+                    grpc::Status(grpc::StatusCode::RESOURCE_EXHAUSTED, "Server at max connections"), this);
+                return;
             }
+
+            connection_acquired_ = true;
+            reply_.set_message("Hello, " + request_.name());
+            status_ = FINISH;
+            responder_.Finish(reply_, grpc::Status::OK, this);
+            break;
+        }
+
+        case FINISH:
+        {
+            delete this;
+            return;
+        }
         }
     }
 
 private:
-    enum CallStatus { CREATE, PROCESS, FINISH };
     helloworld::Greeter::AsyncService* service_;
     grpc::ServerCompletionQueue* cq_;
     Server* server_;
@@ -91,6 +76,7 @@ private:
     helloworld::HelloRequest request_;
     helloworld::HelloReply reply_;
     grpc::ServerAsyncResponseWriter<helloworld::HelloReply> responder_;
+    enum CallStatus { CREATE, PROCESS, FINISH };
     CallStatus status_;
     bool connection_acquired_;
 };
@@ -98,10 +84,7 @@ private:
 Server::Server(std::string server_address, std::string server_name, int max_connections)
     : server_address_(std::move(server_address)), server_name_(std::move(server_name)), max_connections_(max_connections)
 {
-    if (max_connections <= 0)
-    {
-        throw std::invalid_argument("max_connections must be positive");
-    }
+    assert(("max_connections must be positive", max_connections > 0));
 }
 
 Server::~Server()
@@ -157,10 +140,11 @@ void Server::Start()
         << ", spawning " << num_workers
         << " worker threads" << std::endl;
 
-    worker_threads_.reserve(num_workers);
-    for (unsigned int i = 0; i < num_workers; ++i)
+    worker_threads_.resize(num_workers);
+
+    for (auto& thread : worker_threads_)
     {
-        worker_threads_.emplace_back(&Server::HandleRpcs, this);
+        thread = std::thread(&Server::HandleRpcs, this);
     }
 }
 

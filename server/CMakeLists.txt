@@ -1,11 +1,11 @@
 add_executable(grpc_server
-    ${PROJECT_SOURCE_DIR}/src/main.cpp
-    server.cpp
+    src/main.cpp
+    src/server.cpp
 )
 
 target_include_directories(grpc_server
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}
 )
 
 target_link_libraries(grpc_server

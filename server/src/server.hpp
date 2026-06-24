@@ -14,7 +14,7 @@
 class Server
 {
 public:
-    explicit Server(std::string server_address = "0.0.0.0:50051", std::string server_name = "Server", int max_connections = 10);
+    Server(std::string server_address = "0.0.0.0:50051", std::string server_name = "Server", int max_connections = 10);
 
     ~Server();
 

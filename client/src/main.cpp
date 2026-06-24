@@ -187,7 +187,7 @@ void PerformanceTest(const std::string& target_str, int num_requests)
 
 void PrintUsage()
 {
-    std::cout << "\n=== gRPC Greeter Client ===" << std::endl;
+    std::cout << "\n=== gRPC Client ===" << std::endl;
     std::cout << "\nAvailable tests:" << std::endl;
     std::cout << "  1 - Single request" << std::endl;
     std::cout << "  2 - Multiple sequential requests (10)" << std::endl;
@@ -195,9 +195,9 @@ void PrintUsage()
     std::cout << "  4 - Performance test (500 requests)" << std::endl;
     std::cout << "  5 - All tests" << std::endl;
     std::cout << "\nUsage examples:" << std::endl;
-    std::cout << "  greeter_client 1                    (single request)" << std::endl;
-    std::cout << "  greeter_client 3                    (parallel connection test)" << std::endl;
-    std::cout << "  greeter_client 5                    (all tests)" << std::endl;
+    std::cout << "  client 1                    (single request)" << std::endl;
+    std::cout << "  client 3                    (parallel connection test)" << std::endl;
+    std::cout << "  client 5                    (all tests)" << std::endl;
     std::cout << "\nServer parameters:" << std::endl;
     std::cout << "  Address: localhost:50051" << std::endl;
     std::cout << "  Max connections: 3" << std::endl;

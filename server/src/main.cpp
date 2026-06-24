@@ -5,7 +5,7 @@
 #include <chrono>
 
 #include "config/server_config.hpp"
-#include "server/server.hpp"
+#include "server.hpp"
 #include "hello.grpc.pb.h"
 
 namespace hw = helloworld;
