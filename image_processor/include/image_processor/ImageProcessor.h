@@ -1,24 +1,24 @@
 #pragma once
-#include "image_processor/ImageCodec.h"
-#include "image_processor/ImageValidator.h"
-#include "image_processor/CaptionDrawer.h"
+
+#include <memory>
+#include <filesystem>
 #include <string>
+#include <opencv2/core.hpp>
 
-namespace ImageProcessor 
+namespace ImageProcessor
 {
-
-    class ImageProcessor 
+    class ImageProcessor
     {
-    private:
-
-        ImageValidator validator;
-        CaptionDrawer drawer;
-
     public:
+        ImageProcessor();
+        ~ImageProcessor();
 
-        cv::Mat Process(const std::string& input, const std::string& text);
+        cv::Mat Process(const std::filesystem::path& input, const std::string& text);
+        void Save(const cv::Mat& image, const std::filesystem::path& output, int quality);
 
-        void Save(const cv::Mat& image, const std::string& output, int quality);
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl;
     };
 
 }

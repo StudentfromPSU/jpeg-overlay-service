@@ -12,17 +12,11 @@ find_package(OpenCV REQUIRED)
 
 
 set(SOURCES
-    src/ImageValidator.cpp 
-    src/ImageCodec.cpp
-    src/CaptionDrawer.cpp
     src/ImageProcessor.cpp
 )
 
 set(HEADERS
     include/image_processor/Exceptions.h
-    include/image_processor/ImageValidator.h
-    include/image_processor/ImageCodec.h
-    include/image_processor/CaptionDrawer.h
     include/image_processor/ImageProcessor.h
 )
 
@@ -64,10 +58,7 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 set(TEST_SOURCES
-    tests/ImageValidatorTests.cpp
-    tests/ImageCodecTests.cpp
-    tests/CaptionDrawerTests.cpp
-    tests/ImageProcessorTests.cpp
+    tests/ImageProcessorComprehensiveTests.cpp
 )
 
 add_executable(image_processor_tests
