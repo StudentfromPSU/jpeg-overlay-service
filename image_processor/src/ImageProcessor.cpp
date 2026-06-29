@@ -2,31 +2,21 @@
 #include "image_processor/Exceptions.h"
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include <filesystem>
 #include <algorithm>
 #include <vector>
 
 namespace {
 
-    cv::Mat DecodeImage(const std::filesystem::path& path)
+    cv::Mat DecodeImage(const std::vector<uchar>& imageBytes)
     {
-        cv::Mat img = cv::imread(path.string(), cv::IMREAD_UNCHANGED);
-        return img;
+        return cv::imdecode(imageBytes, cv::IMREAD_UNCHANGED);
     }
 
-    void EncodeImage(const cv::Mat& image, const std::filesystem::path& path, int quality)
+    std::vector<uchar> EncodeImage(const cv::Mat& image)
     {
-        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, quality};
-
-        cv::imwrite(path.string(), image, params);
-    }
-
-    void ValidateImageFile(const std::filesystem::path& path)
-    {
-        if (!std::filesystem::is_regular_file(path))
-        {
-            throw ImageProcessor::ImageException("File does not exist: " + path.string());
-        }
+        std::vector<uchar> buffer;
+        cv::imencode(".jpg", image, buffer);
+        return buffer;
     }
 
     void ValidateDecodedImage(const cv::Mat& image)
@@ -34,11 +24,6 @@ namespace {
         if (image.empty())
         {
             throw ImageProcessor::ImageException("Decoded image is empty");
-        }
-
-        if (image.cols <= 0 || image.rows <= 0)
-        {
-            throw ImageProcessor::ImageException("Invalid image dimensions");
         }
     }
 
@@ -179,26 +164,17 @@ namespace ImageProcessor
     class ImageProcessor::Impl
     {
     public:
-        cv::Mat Process(const std::filesystem::path& input, const std::string& text)
+        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text)
         {
-            ValidateImageFile(input);
-
             ValidateCaptionText(text);
 
-            cv::Mat image = DecodeImage(input);
+            cv::Mat image = DecodeImage(imageBytes);
 
             ValidateDecodedImage(image);
 
             AddCaption(image, text);
 
-            return image;
-        }
-
-        void Save(const cv::Mat& image, const std::filesystem::path& output, int quality)
-        {
-            ValidateDecodedImage(image);
-
-            EncodeImage(image, output, quality);
+            return EncodeImage(image);
         }
     };
 
@@ -206,14 +182,9 @@ namespace ImageProcessor
 
     ImageProcessor::~ImageProcessor() = default;
 
-    cv::Mat ImageProcessor::Process(const std::filesystem::path& input, const std::string& text)
+    std::vector<uchar> ImageProcessor::Process(const std::vector<uchar>& imageBytes, const std::string& text)
     {
-        return impl->Process(input, text);
-    }
-
-    void ImageProcessor::Save(const cv::Mat& image, const std::filesystem::path& output, int quality)
-    {
-        impl->Save(image, output, quality);
+        return impl->Process(imageBytes, text);
     }
 
 }

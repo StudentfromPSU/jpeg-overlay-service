@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <filesystem>
+#include <vector>
 #include <string>
 #include <opencv2/core.hpp>
 
@@ -13,8 +13,7 @@ namespace ImageProcessor
         ImageProcessor();
         ~ImageProcessor();
 
-        cv::Mat Process(const std::filesystem::path& input, const std::string& text);
-        void Save(const cv::Mat& image, const std::filesystem::path& output, int quality);
+        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text);
 
     private:
         class Impl;
