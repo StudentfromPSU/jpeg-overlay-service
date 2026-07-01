@@ -7,7 +7,7 @@ struct Config
     std::string host;
     std::string port;
 
-    static Config New()
+    static constexpr Config New()
     {
         Config config;
         config.host = "0.0.0.0";

@@ -16,7 +16,7 @@ set(SOURCES
 )
 
 set(HEADERS
-    include/image_processor/Exceptions.h
+    include/image_processor/ErrorCode.h
     include/image_processor/ImageProcessor.h
 )
 
@@ -58,7 +58,7 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 set(TEST_SOURCES
-    tests/ImageProcessorComprehensiveTests.cpp
+    tests/ImageProcessorTest.cpp
 )
 
 add_executable(image_processor_tests
