@@ -1,39 +1,30 @@
 #include "image_processor/ImageProcessor.h"
-#include "image_processor/ErrorCode.h"
+#include "image_processor/Exceptions.h"
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <algorithm>
 #include <vector>
-#include <system_error>
 
 namespace {
 
-    std::error_code DecodeImage(const std::vector<uchar>& imageBytes, cv::Mat& result)
+    cv::Mat DecodeImage(const std::vector<uchar>& imageBytes)
     {
-        result = cv::imdecode(imageBytes, cv::IMREAD_UNCHANGED);
-        if (result.empty())
-        {
-            return ImageProcessor::make_error_code(ImageProcessor::ImageError::DecodeFailed);
-        }
-        return {};
+        return cv::imdecode(imageBytes, cv::IMREAD_UNCHANGED);
     }
 
-    std::error_code EncodeImage(const cv::Mat& image, std::vector<uchar>& buffer)
+    std::vector<uchar> EncodeImage(const cv::Mat& image)
     {
-        if (!cv::imencode(".jpg", image, buffer) || buffer.empty())
-        {
-            return ImageProcessor::make_error_code(ImageProcessor::ImageError::EncodeFailed);
-        }
-        return {};
+        std::vector<uchar> buffer;
+        cv::imencode(".jpg", image, buffer);
+        return buffer;
     }
 
-    std::error_code ValidateCaptionText(const std::string& text)
+    void ValidateDecodedImage(const cv::Mat& image)
     {
-        if (text.empty())
+        if (image.empty())
         {
-            return ImageProcessor::make_error_code(ImageProcessor::ImageError::EmptyCaption);
+            throw ImageProcessor::ImageException("Decoded image is empty");
         }
-        return {};
     }
 
     void AddCaption(cv::Mat& image, const std::string& text)
@@ -82,24 +73,16 @@ namespace ImageProcessor
     class ImageProcessor::Impl
     {
     public:
-        std::error_code Process(
-            const std::vector<uchar>& imageBytes,
-            const std::string& text,
-            std::vector<uchar>& result)
+        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text)
         {
-            if (auto ec = ValidateCaptionText(text))
-                return ec;
 
-            cv::Mat image;
-            if (auto ec = DecodeImage(imageBytes, image))
-                return ec;
+            cv::Mat image = DecodeImage(imageBytes);
+
+            ValidateDecodedImage(image);
 
             AddCaption(image, text);
 
-            if (auto ec = EncodeImage(image, result))
-                return ec;
-
-            return {};
+            return EncodeImage(image);
         }
     };
 
@@ -107,9 +90,9 @@ namespace ImageProcessor
 
     ImageProcessor::~ImageProcessor() = default;
 
-    std::error_code ImageProcessor::Process(const std::vector<uchar>& imageBytes, const std::string& text, std::vector<uchar>& result)
+    std::vector<uchar> ImageProcessor::Process(const std::vector<uchar>& imageBytes, const std::string& text)
     {
-        return impl->Process(imageBytes, text, result);
+        return impl->Process(imageBytes, text);
     }
 
 }

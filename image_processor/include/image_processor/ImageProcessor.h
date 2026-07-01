@@ -3,9 +3,7 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <system_error>
 #include <opencv2/core.hpp>
-#include "ErrorCode.h"
 
 namespace ImageProcessor
 {
@@ -15,10 +13,7 @@ namespace ImageProcessor
         ImageProcessor();
         ~ImageProcessor();
 
-        std::error_code Process(
-            const std::vector<uchar>& imageBytes,
-            const std::string& text,
-            std::vector<uchar>& result);
+        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text);
 
     private:
         class Impl;
