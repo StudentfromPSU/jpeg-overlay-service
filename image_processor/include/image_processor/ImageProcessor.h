@@ -3,17 +3,18 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <opencv2/core.hpp>
 
 namespace ImageProcessor
 {
+    using Byte = unsigned char;
+
     class ImageProcessor
     {
     public:
         ImageProcessor();
         ~ImageProcessor();
 
-        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text);
+        std::vector<Byte> Process(const std::vector<Byte>& imageBytes, const std::string& text);
 
     private:
         class Impl;

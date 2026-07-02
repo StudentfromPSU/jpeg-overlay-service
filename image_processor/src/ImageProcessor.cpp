@@ -3,18 +3,17 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <algorithm>
-#include <vector>
 
 namespace {
 
-    cv::Mat DecodeImage(const std::vector<uchar>& imageBytes)
+    cv::Mat DecodeImage(const std::vector<ImageProcessor::Byte>& imageBytes)
     {
         return cv::imdecode(imageBytes, cv::IMREAD_UNCHANGED);
     }
 
-    std::vector<uchar> EncodeImage(const cv::Mat& image)
+    std::vector<ImageProcessor::Byte> EncodeImage(const cv::Mat& image)
     {
-        std::vector<uchar> buffer;
+        std::vector<ImageProcessor::Byte> buffer;
         cv::imencode(".jpg", image, buffer);
         return buffer;
     }
@@ -24,6 +23,22 @@ namespace {
         if (image.empty())
         {
             throw ImageProcessor::ImageException("Decoded image is empty");
+        }
+    }
+
+    void ValidateCaptionText(const std::string& text)
+    {
+        if (text.empty())
+        {
+            throw ImageProcessor::ImageException("Caption text is empty");
+        }
+    }
+
+    void ValidateImageBytes(const std::vector<ImageProcessor::Byte>& imageBytes)
+    {
+        if (imageBytes.empty())
+        {
+            throw ImageProcessor::ImageException("Image data is empty");
         }
     }
 
@@ -73,12 +88,15 @@ namespace ImageProcessor
     class ImageProcessor::Impl
     {
     public:
-        std::vector<uchar> Process(const std::vector<uchar>& imageBytes, const std::string& text)
+        std::vector<Byte> Process(const std::vector<Byte>& imageBytes, const std::string& text)
         {
+            ValidateImageBytes(imageBytes);
 
             cv::Mat image = DecodeImage(imageBytes);
 
             ValidateDecodedImage(image);
+
+            ValidateCaptionText(text);
 
             AddCaption(image, text);
 
@@ -90,7 +108,7 @@ namespace ImageProcessor
 
     ImageProcessor::~ImageProcessor() = default;
 
-    std::vector<uchar> ImageProcessor::Process(const std::vector<uchar>& imageBytes, const std::string& text)
+    std::vector<Byte> ImageProcessor::Process(const std::vector<Byte>& imageBytes, const std::string& text)
     {
         return impl->Process(imageBytes, text);
     }

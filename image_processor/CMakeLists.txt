@@ -16,7 +16,7 @@ set(SOURCES
 )
 
 set(HEADERS
-    include/image_processor/ErrorCode.h
+    include/image_processor/Exceptions.h
     include/image_processor/ImageProcessor.h
 )
 
