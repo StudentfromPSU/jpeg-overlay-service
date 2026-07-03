@@ -85,6 +85,9 @@ void ConnectionLimitTestParallel(const std::string& target_str, int num_clients)
     std::vector<int> results(num_clients, 0);
     std::mutex result_mutex;
 
+    channels.reserve(num_clients);
+    clients.reserve(num_clients);
+
     for (int i = 0; i < num_clients; ++i)
     {
         auto channel = grpc::CreateChannel(
@@ -94,6 +97,7 @@ void ConnectionLimitTestParallel(const std::string& target_str, int num_clients)
     }
 
     std::vector<std::thread> threads;
+    threads.reserve(num_clients);
 
     for (int i = 0; i < num_clients; ++i)
     {
@@ -152,7 +156,6 @@ void ConnectionLimitTestParallel(const std::string& target_str, int num_clients)
     std::cout << "Successful: " << success_count << std::endl;
     std::cout << "Rejected: " << rejected_count << std::endl;
     std::cout << "Total: " << success_count + rejected_count << std::endl;
-
 }
 
 void PerformanceTest(const std::string& target_str, int num_requests)
