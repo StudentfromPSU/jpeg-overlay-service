@@ -27,7 +27,7 @@ public:
 private:
     std::unique_ptr<grpc::Server> server_;
     std::unique_ptr<grpc::ServerCompletionQueue> completion_queue_;
-    std::unique_ptr<helloworld::Greeter::AsyncService> async_service_;
+    std::unique_ptr<imageprocessor::ImageProcessor::AsyncService> async_service_;
     std::string server_address_;
     std::string server_name_;
     std::vector<std::thread> worker_threads_;
@@ -37,5 +37,5 @@ private:
     std::atomic<uint32_t> active_connections_{0};
 
     void HandleRpcs();
-    void RequestNewCall(helloworld::Greeter::AsyncService* service);
+    void RequestNewCall(imageprocessor::ImageProcessor::AsyncService* service);
 };

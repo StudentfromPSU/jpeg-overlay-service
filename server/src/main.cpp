@@ -8,7 +8,7 @@
 #include "server.hpp"
 #include "hello.grpc.pb.h"
 
-namespace hw = helloworld;
+namespace ip = imageprocessor;
 
 std::atomic<bool> shutdown_requested{false};
 
@@ -31,7 +31,7 @@ int main()
         }
 
         Config config = Config::New();
-        auto server = std::make_unique<Server>(config.host + ":" + config.port, hw::Greeter::service_full_name(), 3);
+        auto server = std::make_unique<Server>(config.host + ":" + config.port, ip::ImageProcessor::service_full_name(), 3);
 
         server->Start();
 

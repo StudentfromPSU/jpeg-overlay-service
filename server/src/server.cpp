@@ -5,11 +5,13 @@
 #include <thread>
 #include <cstdint>
 #include "hello.grpc.pb.h"
+#include "image_processor/ImageProcessor.h"
+#include "image_processor/Exceptions.h"
 
 class CallData
 {
 public:
-    CallData(helloworld::Greeter::AsyncService* service, grpc::ServerCompletionQueue* cq, Server* server)
+    CallData(imageprocessor::ImageProcessor::AsyncService* service, grpc::ServerCompletionQueue* cq, Server* server)
         : service_(service), cq_(cq), server_(server), responder_(&ctx_), status_(CREATE), connection_acquired_(false)
     {
         Proceed(true);
@@ -30,7 +32,7 @@ public:
         case CREATE:
         {
             status_ = PROCESS;
-            service_->RequestSayHello(&ctx_, &request_, &responder_, cq_, cq_, this);
+            service_->RequestProcessImage(&ctx_, &request_, &responder_, cq_, cq_, this);
             break;
         }
 
@@ -54,9 +56,30 @@ public:
             }
 
             connection_acquired_ = true;
-            reply_.set_message("Hello, " + request_.name());
-            status_ = FINISH;
-            responder_.Finish(reply_, grpc::Status::OK, this);
+
+            try
+            {
+                ImageProcessor::ImageProcessor processor;
+                std::vector<unsigned char> imageBytes(request_.image().begin(), request_.image().end());
+                std::vector<unsigned char> processedImage = processor.Process(imageBytes, request_.text());
+                reply_.set_image(processedImage.data(), processedImage.size());
+                status_ = FINISH;
+                responder_.Finish(reply_, grpc::Status::OK, this);
+            }
+            catch (const ImageProcessor::ImageException& e)
+            {
+                std::cerr << "Image processing error: " << e.what() << std::endl;
+                status_ = FINISH;
+                responder_.FinishWithError(
+                    grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, e.what()), this);
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << "Unexpected error: " << e.what() << std::endl;
+                status_ = FINISH;
+                responder_.FinishWithError(
+                    grpc::Status(grpc::StatusCode::INTERNAL, "Internal server error"), this);
+            }
             break;
         }
 
@@ -69,13 +92,13 @@ public:
     }
 
 private:
-    helloworld::Greeter::AsyncService* service_;
+    imageprocessor::ImageProcessor::AsyncService* service_;
     grpc::ServerCompletionQueue* cq_;
     Server* server_;
     grpc::ServerContext ctx_;
-    helloworld::HelloRequest request_;
-    helloworld::HelloReply reply_;
-    grpc::ServerAsyncResponseWriter<helloworld::HelloReply> responder_;
+    imageprocessor::ImageRequest request_;
+    imageprocessor::ImageResponse reply_;
+    grpc::ServerAsyncResponseWriter<imageprocessor::ImageResponse> responder_;
     enum CallStatus { CREATE, PROCESS, FINISH };
     CallStatus status_;
     bool connection_acquired_;
@@ -118,7 +141,7 @@ void Server::Start()
 
     completion_queue_ = builder.AddCompletionQueue();
 
-    async_service_ = std::make_unique<helloworld::Greeter::AsyncService>();
+    async_service_ = std::make_unique<imageprocessor::ImageProcessor::AsyncService>();
     builder.RegisterService(async_service_.get());
 
     server_ = builder.BuildAndStart();
@@ -195,7 +218,7 @@ void Server::HandleRpcs()
     }
 }
 
-void Server::RequestNewCall(helloworld::Greeter::AsyncService* service)
+void Server::RequestNewCall(imageprocessor::ImageProcessor::AsyncService* service)
 {
     new CallData(service, completion_queue_.get(), this);
 }

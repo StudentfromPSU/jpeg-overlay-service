@@ -11,4 +11,5 @@ target_include_directories(grpc_server
 target_link_libraries(grpc_server
     PRIVATE
         genproto_lib
+        image_processor
 )
