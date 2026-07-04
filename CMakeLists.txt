@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
-    add_compile_options(/W4 /WX /wd4996 /wd4702)
+    add_compile_options(/W4 /WX /wd4996 /wd4702 /wd4864)
 else()
     add_compile_options(
         -Wall
@@ -63,5 +63,6 @@ target_link_libraries(genproto_lib
         gRPC::grpc++
 )
 
+add_subdirectory(image_processor)
 add_subdirectory(client)
 add_subdirectory(server)
