@@ -57,29 +57,38 @@ public:
 
             connection_acquired_ = true;
 
-            try
-            {
-                ImageProcessor::ImageProcessor processor;
-                std::vector<unsigned char> imageBytes(request_.image().begin(), request_.image().end());
-                std::vector<unsigned char> processedImage = processor.Process(imageBytes, request_.text());
-                reply_.set_image(processedImage.data(), processedImage.size());
-                status_ = FINISH;
-                responder_.Finish(reply_, grpc::Status::OK, this);
-            }
-            catch (const ImageProcessor::ImageException& e)
-            {
-                std::cerr << "Image processing error: " << e.what() << std::endl;
-                status_ = FINISH;
-                responder_.FinishWithError(
-                    grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, e.what()), this);
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << "Unexpected error: " << e.what() << std::endl;
-                status_ = FINISH;
-                responder_.FinishWithError(
-                    grpc::Status(grpc::StatusCode::INTERNAL, "Internal server error"), this);
-            }
+            auto imageData = std::string(request_.image());
+            auto text = request_.text();
+
+            auto task = [this, imageData = std::move(imageData), text = std::move(text)]() {
+                try
+                {
+                    ImageProcessor::ImageProcessor processor;
+                    std::vector<unsigned char> imageBytes(imageData.begin(), imageData.end());
+                    std::vector<unsigned char> processedImage = processor.Process(imageBytes, text);
+
+                    reply_.set_image(processedImage.data(), processedImage.size());
+
+                    responder_.Finish(reply_, grpc::Status::OK, this);
+                }
+                catch (const ImageProcessor::ImageException& e)
+                {
+                    std::cerr << "Image processing error: " << e.what() << std::endl;
+                    responder_.FinishWithError(
+                        grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, e.what()), this);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "Unexpected error: " << e.what() << std::endl;
+                    responder_.FinishWithError(
+                        grpc::Status(grpc::StatusCode::INTERNAL, "Internal server error"), this);
+                }
+            };
+
+            status_ = FINISH;
+
+            server_->EnqueueProcessingTask(std::move(task));
+
             break;
         }
 
@@ -133,6 +142,46 @@ void Server::ReleaseConnection()
     active_connections_.fetch_sub(1, std::memory_order_release);
 }
 
+void Server::EnqueueProcessingTask(std::function<void()> task)
+{
+    {
+        std::lock_guard<std::mutex> lock(processing_mutex_);
+        processing_tasks_.push(std::move(task));
+    }
+    processing_cv_.notify_one();
+}
+
+void Server::ProcessTasks()
+{
+    while (true)
+    {
+        std::function<void()> task;
+
+        {
+            std::unique_lock<std::mutex> lock(processing_mutex_);
+            processing_cv_.wait(lock, [this] {
+                return !processing_tasks_.empty() || processing_shutdown_.load(std::memory_order_acquire);
+            });
+
+            if (processing_shutdown_.load(std::memory_order_acquire) && processing_tasks_.empty())
+            {
+                break;
+            }
+
+            if (!processing_tasks_.empty())
+            {
+                task = std::move(processing_tasks_.front());
+                processing_tasks_.pop();
+            }
+        }
+
+        if (task)
+        {
+            task();
+        }
+    }
+}
+
 void Server::Start()
 {
     grpc::ServerBuilder builder;
@@ -157,14 +206,19 @@ void Server::Start()
     RequestNewCall(async_service_.get());
 
     const unsigned int hardware_threads = std::thread::hardware_concurrency();
-    const unsigned int num_workers = std::max(1u, hardware_threads);
+    const unsigned int num_cq_threads = std::max(2u, std::min(4u, hardware_threads / 4));
+    const unsigned int num_processing_threads = std::max(1u, hardware_threads - num_cq_threads);
 
-    std::cout << "Available CPU cores: " << hardware_threads
-        << ", spawning " << num_workers
-        << " worker threads" << std::endl;
+    std::cout << "CompletionQueue threads: " << num_cq_threads << std::endl;
+    std::cout << "Processing threads: " << num_processing_threads << std::endl;
 
-    worker_threads_.resize(num_workers);
+    processing_threads_.resize(num_processing_threads);
+    for (auto& thread : processing_threads_)
+    {
+        thread = std::thread(&Server::ProcessTasks, this);
+    }
 
+    worker_threads_.resize(num_cq_threads);
     for (auto& thread : worker_threads_)
     {
         thread = std::thread(&Server::HandleRpcs, this);
@@ -184,6 +238,17 @@ void Server::Stop()
     std::cout << this->server_name_ << " shutting down, please wait..." << std::endl;
 
     server_->Shutdown();
+
+    processing_shutdown_.store(true, std::memory_order_release);
+    processing_cv_.notify_all();
+
+    for (auto& t : processing_threads_)
+    {
+        if (t.joinable())
+        {
+            t.join();
+        }
+    }
 
     if (completion_queue_)
     {
