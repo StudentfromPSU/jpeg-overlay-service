@@ -8,6 +8,10 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
 
 #include "hello.grpc.pb.h"
 
@@ -21,8 +25,13 @@ public:
     void Start();
     void Stop();
 
+    void OnCallStarted();
+    void OnCallFinished();
+
     bool TryAcquireConnection();
     void ReleaseConnection();
+
+    void EnqueueProcessingTask(std::function<void()> task);
 
 private:
     std::unique_ptr<grpc::Server> server_;
@@ -31,11 +40,22 @@ private:
     std::string server_address_;
     std::string server_name_;
     std::vector<std::thread> worker_threads_;
-    std::atomic<bool> shutdown_requested_{false};
+    std::vector<std::thread> processing_threads_;
+    bool processing_shutdown_ = false;
+    std::atomic<bool> shutdown_requested_{ false };
 
     uint32_t max_connections_;
-    std::atomic<uint32_t> active_connections_{0};
+    std::atomic<uint32_t> active_connections_{ 0 };
+
+    std::queue<std::function<void()>> processing_tasks_;
+    std::mutex processing_mutex_;
+    std::condition_variable processing_cv_;
+
+    std::mutex shutdown_mutex_;
+    std::condition_variable shutdown_cv_;
+    int64_t in_flight_calls_ = 0;
 
     void HandleRpcs();
+    void ProcessTasks();
     void RequestNewCall(imageprocessor::ImageProcessor::AsyncService* service);
 };
