@@ -44,6 +44,8 @@ public:
                 return;
             }
 
+            server_->OnCallStarted();
+
             new CallData(service_, cq_, server_);
 
             if (!server_->TryAcquireConnection())
@@ -94,6 +96,7 @@ public:
 
         case FINISH:
         {
+            server_->OnCallFinished();
             delete this;
             return;
         }
@@ -156,14 +159,13 @@ void Server::ProcessTasks()
     while (true)
     {
         std::function<void()> task;
-
         {
             std::unique_lock<std::mutex> lock(processing_mutex_);
             processing_cv_.wait(lock, [this] {
-                return !processing_tasks_.empty() || processing_shutdown_.load(std::memory_order_acquire);
-            });
+                return !processing_tasks_.empty() || processing_shutdown_;
+                });
 
-            if (processing_shutdown_.load(std::memory_order_acquire) && processing_tasks_.empty())
+            if (processing_shutdown_ && processing_tasks_.empty())
             {
                 break;
             }
@@ -228,26 +230,21 @@ void Server::Start()
 void Server::Stop()
 {
     bool expected = false;
-    if (!shutdown_requested_.compare_exchange_strong(expected, true, std::memory_order_acq_rel, std::memory_order_acquire))
+    if (!shutdown_requested_.compare_exchange_strong(
+        expected, true, std::memory_order_acq_rel, std::memory_order_acquire))
     {
         return;
     }
-
     if (!server_) return;
 
-    std::cout << this->server_name_ << " shutting down, please wait..." << std::endl;
+    std::cout << server_name_ << " shutting down, please wait..." << std::endl;
 
-    server_->Shutdown();
+    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(10);
+    server_->Shutdown(deadline);
 
-    processing_shutdown_.store(true, std::memory_order_release);
-    processing_cv_.notify_all();
-
-    for (auto& t : processing_threads_)
     {
-        if (t.joinable())
-        {
-            t.join();
-        }
+        std::unique_lock<std::mutex> lock(shutdown_mutex_);
+        shutdown_cv_.wait(lock, [this] { return in_flight_calls_ == 0; });
     }
 
     if (completion_queue_)
@@ -255,15 +252,22 @@ void Server::Stop()
         completion_queue_->Shutdown();
     }
 
+    {
+        std::lock_guard<std::mutex> lock(processing_mutex_);
+        processing_shutdown_ = true;
+    }
+    processing_cv_.notify_all();
+
     for (auto& t : worker_threads_)
     {
-        if (t.joinable())
-        {
-            t.join();
-        }
+        if (t.joinable()) t.join();
+    }
+    for (auto& t : processing_threads_)
+    {
+        if (t.joinable()) t.join();
     }
 
-    std::cout << this->server_name_ << " shutdown complete" << std::endl;
+    std::cout << server_name_ << " shutdown complete" << std::endl;
 }
 
 void Server::HandleRpcs()
@@ -286,4 +290,17 @@ void Server::HandleRpcs()
 void Server::RequestNewCall(imageprocessor::ImageProcessor::AsyncService* service)
 {
     new CallData(service, completion_queue_.get(), this);
+}
+
+void Server::OnCallStarted()
+{
+    std::lock_guard<std::mutex> lock(shutdown_mutex_);
+    ++in_flight_calls_;
+}
+
+void Server::OnCallFinished()
+{
+    std::lock_guard<std::mutex> lock(shutdown_mutex_);
+    --in_flight_calls_;
+    shutdown_cv_.notify_all();
 }

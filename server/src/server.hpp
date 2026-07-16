@@ -25,6 +25,9 @@ public:
     void Start();
     void Stop();
 
+    void OnCallStarted();
+    void OnCallFinished();
+
     bool TryAcquireConnection();
     void ReleaseConnection();
 
@@ -38,6 +41,7 @@ private:
     std::string server_name_;
     std::vector<std::thread> worker_threads_;
     std::vector<std::thread> processing_threads_;
+    bool processing_shutdown_ = false;
     std::atomic<bool> shutdown_requested_{ false };
 
     uint32_t max_connections_;
@@ -46,7 +50,10 @@ private:
     std::queue<std::function<void()>> processing_tasks_;
     std::mutex processing_mutex_;
     std::condition_variable processing_cv_;
-    std::atomic<bool> processing_shutdown_{ false };
+
+    std::mutex shutdown_mutex_;
+    std::condition_variable shutdown_cv_;
+    int64_t in_flight_calls_ = 0;
 
     void HandleRpcs();
     void ProcessTasks();
